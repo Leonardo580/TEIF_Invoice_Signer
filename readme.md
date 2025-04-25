@@ -95,10 +95,10 @@ This requires you to run a simple HTTP server class .
     *   The endpoint accepts POST requests with the XML invoice content in the request body.
     *   Read the request body.
     *   Instantiate `XadesSignerForTEIF`.
-    *   Write the signed XML string back as the HTTP response with `Content-Type: application/xml`.
+    *   Write the signed XML string back as the HTTP response with `Content-Type: application/octet-stream`.
 3.  **Send Request:** Use a tool like `curl` or Postman to send a POST request to your server's endpoint (`http://localhost:10000/sign_invoice`) with the raw TEIF XML invoice in the request body.
 
 **Example `curl` command:**
 
 ```bash
-curl -X POST -H "Content-Type: application/xml" --data-binary "@path/to/your/invoice.xml" http://localhost:10000/sign-invoice -o signed_invoice_from_api.xml
+curl -X POST -H "Content-Type: application/octet-stream" --data-binary "@path/to/your/invoice.xml" http://localhost:10000/sign-invoice -o signed_invoice_from_api.xml
