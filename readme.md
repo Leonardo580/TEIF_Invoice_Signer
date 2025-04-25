@@ -2,6 +2,7 @@
 
 This project provides a Java implementation for signing Tunisian Electronic Invoice Format (TEIF) XML invoices according to the XAdES-BES standard specified by the `el fatoora` platform, using Apache Santuario. It also includes a basic HTTP server example to demonstrate receiving and signing an invoice via an API endpoint.
 
+**<i>Warnings: The API in this project is very basic and isn't recommended for production<i>**
 ## Features
 
 *   Signs TEIF XML invoices using XAdES-BES (Baseline Profile).
@@ -35,13 +36,27 @@ This project provides a Java implementation for signing Tunisian Electronic Invo
 
 2.  **Place Keystore:**
     *   Create a `keys/` directory in the project root (if it doesn't exist).
+        * If you want to generate key run the following commands (You need java keytools )
+            ```bash 
+          keytool -genkeypair -alias <your_alias> -keyalg RSA -keysize 3072 \
+          -sigalg SHA256withRSA -storetype PKCS12 -keystore <your_keystore_file_name> \
+          -storepass <your_storepass> -keypass <your_keypass> \
+          -dname "CN=<Your Company Name>, OU=<Your Unit>, O=<Your Org>, L=<Your City>, ST=<Your State>, C=TN"
+          keytool -certreq -alias <your_alias> \ 
+          -keystore <your_keystore_file_name> \
+          -storepass <your_storepass> -file request.csr
+          keytool -importcert -alias <your_alias> \
+          -keystore <your_keystore_file_name> \
+          -storepass <your_storepass> -file ./request.csr \
+          -trustcacerts
+        
     *   Place your PKCS#12 keystore file (e.g., `keystore.p12`) inside the `keys/` directory.
 
 3.  **Place Signature Policy PDF:**
-    *   Place the downloaded `Politique_de_Signature_de_la_facture_2.0.pdf` (or the correct version) inside the `keys/` directory (or update the path in the code).
+    *   [Download](https://www.tradenet.com.tn/wp-content/uploads/simple-file-list/Politique_de_Signature_de_la_facture_2.0.pdf) and place `Politique_de_Signature_de_la_facture_2.0.pdf` (or the correct version) inside the `keys/` directory (or update the path in the code).
 
 4.  **Configure `XadesSignerForTEIF.java`:**
-    *   Open `.env`.
+    *   Create `.env` file.
     *   Update the following constants with your specific details:
         ```dotenv
         KEYSTORE_TYPE="{YOUR_KEYSTORE_TYPE}" // example PKCS12
