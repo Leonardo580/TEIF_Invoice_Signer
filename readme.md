@@ -60,7 +60,7 @@ This project provides a Java implementation for signing Tunisian Electronic Invo
     *   Update the following constants with your specific details:
         ```dotenv
         KEYSTORE_TYPE="{YOUR_KEYSTORE_TYPE}" // example PKCS12
-        KEYSTORE_PATH="PATH_TO_YOUR_KEY"  
+        KEYSTORE_PATH="{PATH_TO_YOUR_KEY}"  
         KEYSTORE_PASSWORD="{PASSWORD}"
         PRIVATE_KEY_ALIAS="{PIRVATE_KEY_ALIAS}"
         PRIVATE_KEY_PASSWORD="{PRIVATE_KEY_ALIAS}"
