@@ -1,4 +1,4 @@
-package org.example;
+package org.api;
 
 import java.io.FileInputStream;
 import java.io.InputStream;

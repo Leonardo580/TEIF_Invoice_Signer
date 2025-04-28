@@ -1,5 +1,6 @@
-package org.example; // Your package name
+package org.api; // Your package name
 
+import io.github.cdimascio.dotenv.Dotenv;
 import org.apache.xml.security.exceptions.XMLSecurityException;
 import org.apache.xml.security.signature.ObjectContainer;
 import org.apache.xml.security.signature.XMLSignature;
@@ -7,6 +8,7 @@ import org.apache.xml.security.transforms.Transforms;
 import org.apache.xml.security.transforms.params.XPathContainer;
 import org.apache.xml.security.utils.Constants;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
+import org.api.PolicyHash;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.w3c.dom.Document;
@@ -14,10 +16,11 @@ import org.w3c.dom.Element;
 import org.xml.sax.InputSource;
 
 import javax.xml.XMLConstants;
-import javax.xml.crypto.dsig.CanonicalizationMethod; // Standard API constants
+import javax.xml.crypto.dsig.CanonicalizationMethod;
 import javax.xml.crypto.dsig.DigestMethod;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.transform.OutputKeys;
 import javax.xml.transform.Transformer;
 import javax.xml.transform.TransformerException;
@@ -25,6 +28,9 @@ import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
 import java.io.*;
+import java.nio.file.FileAlreadyExistsException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.security.*;
 import java.security.cert.CertificateEncodingException;
 import java.security.cert.X509Certificate;
@@ -32,8 +38,6 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.Base64;
-
-import io.github.cdimascio.dotenv.Dotenv;
 
 public class XadesSignerForTEIF {
 
@@ -45,7 +49,7 @@ public class XadesSignerForTEIF {
     private static final String KEYSTORE_PASSWORD = dotenv.get("KEYSTORE_PASSWORD"); // CHANGE THIS
     private static final String PRIVATE_KEY_ALIAS = dotenv.get("PRIVATE_KEY_ALIAS"); // CHANGE THIS
     private static final String PRIVATE_KEY_PASSWORD = dotenv.get("PRIVATE_KEY_PASSWORD"); // CHANGE THIS
-    private static final String OUTPUT_XML_PATH_DIR = "elfatooraSpecTech/"; // CHANGE THIS (Corrected)
+    private static final String OUTPUT_XML_PATH_DIR = dotenv.get("OUTPUT_XML_PATH_DIR"); // CHANGE THIS (Corrected)
 
     // --- Signature Policy (Example - Verify if explicit policy needed) ---
     private static final boolean USE_EXPLICIT_POLICY = true; // Set to true for explicit policy
@@ -94,14 +98,15 @@ public class XadesSignerForTEIF {
             log.info("Starting XML signing process...");
             XadesSignerForTEIF signer = new XadesSignerForTEIF();
             String xmlpath = "elfatooraSpecTech/Invoice Export Sample.xml";
-            signer.signSave(xmlpath);
+            String xmlcontent = Files.readString(Paths.get(xmlpath));
+            log.info(signer.signAndGetText(xmlcontent));
             log.info("XML signed successfully using Santuario! Output: {}", OUTPUT_XML_PATH_DIR);
         } catch (Exception e) {
             log.error("Error signing XML with Santuario: {}", e.getMessage(), e);
         }
     }
 
-    public Document sign(String XmlPathOrText) throws Exception {
+    public Document sign(String XmlContent, Document doc) throws Exception {
         // 1. Load Keystore
         log.debug("Loading keystore from: {}", KEYSTORE_PATH);
         KeyStore ks = KeyStore.getInstance(KEYSTORE_TYPE);
@@ -116,8 +121,7 @@ public class XadesSignerForTEIF {
         log.debug("Keystore loaded successfully. Certificate Subject: {}", signingCert.getSubjectX500Principal());
 
         // 2. Load XML Document
-        log.debug("Loading XML document from: {}", XmlPathOrText);
-        Document doc = loadDocument(XmlPathOrText);
+        log.debug("Loading XML document from: {}", XmlContent);
         Element rootElement = doc.getDocumentElement();
         log.debug("XML document loaded.");
 
@@ -206,14 +210,24 @@ public class XadesSignerForTEIF {
      */
     public void signSave(String XmlPathOrText) throws Exception {
         log.info("Saving signed document to: {}", OUTPUT_XML_PATH_DIR);
-
-        Document doc = sign(XmlPathOrText);
+        Document d = loadDocumentFromFile(XmlPathOrText);
+        Document doc = sign(XmlPathOrText, d);
         String file_name = getFileName(XmlPathOrText);
+        createDirIfNotExist(XmlPathOrText);
         saveDocument(doc, OUTPUT_XML_PATH_DIR + String.format("%s_signed.xml", file_name));
 
     }
+    private Boolean createDirIfNotExist(String dirName) throws IOException{
+        File dir = new File(dirName);
+        if (dir.isFile())
+            throw new FileAlreadyExistsException(dirName);
+        if (!dir.exists())
+            return dir.mkdir();
+        return true;
+    }
     public String signAndGetText(String XmlPathOrText) throws Exception{
-        Document doc = sign(XmlPathOrText);
+        Document d = loadDocument(XmlPathOrText);
+        Document doc = sign(XmlPathOrText, d);
         return getDocumentText(doc);
     }
 
@@ -383,17 +397,18 @@ public class XadesSignerForTEIF {
     }
 
     // --- XML Helper Methods ---
-    private Document loadDocument(String xmlPath) throws Exception {
+    private DocumentBuilder configureDocumentBuilder() throws ParserConfigurationException {
         DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
         dbf.setNamespaceAware(true); // Crucial!
         // Optional: Add security features to prevent XXE
-        dbf.setFeature(javax.xml.XMLConstants.FEATURE_SECURE_PROCESSING, true);
+        dbf.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
         dbf.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
 
-        // dbf.setXIncludeAware(false); // Disable XInclude if not needed
-        // dbf.setExpandEntityReferences(false); // Don't expand external entities
 
-        DocumentBuilder db = dbf.newDocumentBuilder();
+        return dbf.newDocumentBuilder();
+    }
+    private Transformer configureTransformer() throws TransformerException {
+
         // Optional: Set an ErrorHandler to catch parsing errors
         // db.setErrorHandler(...);
         TransformerFactory tf = TransformerFactory.newInstance();
@@ -403,12 +418,26 @@ public class XadesSignerForTEIF {
         transformer.setOutputProperty("omit-xml-declaration", "yes");
         transformer.setOutputProperty("indent", "no"); // Crucial for single line
         transformer.setOutputProperty("standalone", "yes"); // Optional
+        return transformer;
+    }
+    private Document loadDocumentFromFile(String xmlPath) throws Exception {
+
         StringWriter writer = new StringWriter();
-        File xml = new File(xmlPath);
-        if (xml.exists() && !xml.isDirectory())
-            transformer.transform(new DOMSource(db.parse(new File(xmlPath))), new StreamResult(writer));
-        else
-            transformer.transform(new DOMSource(db.parse(xml)), new StreamResult(writer));
+        File xmlFile = new File(xmlPath);
+        Transformer transformer = configureTransformer();
+        DocumentBuilder db= configureDocumentBuilder();
+        if (xmlFile.exists() && !xmlFile.isDirectory())
+            transformer.transform(new DOMSource(db.parse(xmlFile)), new StreamResult(writer));
+        return db.parse(new InputSource(new StringReader(writer.toString())));
+
+    }
+
+    private Document loadDocument(String xml) throws Exception {
+        StringWriter writer = new StringWriter();
+
+        Transformer transformer = configureTransformer();
+        DocumentBuilder db= configureDocumentBuilder();
+        transformer.transform(new DOMSource(db.parse(new InputSource(new StringReader(xml)))), new StreamResult(writer));
         return db.parse(new InputSource(new StringReader(writer.toString())));
     }
 

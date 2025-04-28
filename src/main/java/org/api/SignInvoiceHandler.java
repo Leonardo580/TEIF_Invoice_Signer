@@ -2,7 +2,7 @@ package org.api;
 
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
-import org.example.XadesSignerForTEIF;
+import org.api.XadesSignerForTEIF;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.io.IOException;
@@ -21,6 +21,7 @@ public class SignInvoiceHandler implements HttpHandler {
             String xmlContent= new Scanner(requestedBody, StandardCharsets.UTF_8)
                     .useDelimiter("\\A")
                     .next();
+            logger.info("reading content");
             requestedBody.close();
             String signed_string_invoice = "";
             try {

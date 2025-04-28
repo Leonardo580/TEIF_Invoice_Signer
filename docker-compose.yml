@@ -1,0 +1,11 @@
+
+  services:
+    java-server:
+      build: .
+      ports:
+        - "10001:10001"
+      env_file:
+        - .env
+      volumes:
+        - ./keys:/app/keys:ro
+        - ./${OUTPUT_XML_PATH_DIR}:/app/${OUTPUT_XML_PATH_DIR}
